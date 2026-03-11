@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -e
+echo "Running application..."
+echo "Replace this with your actual app start command."
