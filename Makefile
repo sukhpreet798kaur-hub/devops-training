@@ -1,10 +1,10 @@
 .PHONY: test run backup
 
 test:
-	./scripts/test.sh
+./scripts/test.sh
 
 run:
-	./scripts/run.sh
+./scripts/run.sh
 
 backup:
-	./scripts/backup.sh
+./scripts/backup.sh
