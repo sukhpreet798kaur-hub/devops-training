@@ -22,3 +22,5 @@
   - `chore: restructure repository`
   - `docs: add README steps`
   - `fix: correct backup script`
+
+.github/PULL_REQUEST_TEMPLATE.md
