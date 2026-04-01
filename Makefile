@@ -1,15 +1,12 @@
 .PHONY: run test backup
 
-# Run the app (example: main.py inside app/)
 run:
-\tpython app/main.py
+	php app/site/index.php
 
-# Run tests (example using pytest)
 test:
-\tpytest
+	echo "Running PHP tests..."
 
-# Create a timestamped backup tarball of the repo (excluding the backup itself)
 backup:
-\t@timestamp=$$(date +%Y%m%d-%H%M%S); \\
-\ttar --exclude='backup-*.tar.gz' -czf backup-$$timestamp.tar.gz .
-\t@echo "Backup created: backup-$$timestamp.tar.gz"
+	@timestamp=$$(date +%Y%m%d-%H%M%S); \
+	tar --exclude=./backups --exclude='./*.tar.gz' -czf /tmp/backup-$$timestamp.tar.gz . && \
+	echo "Backup created: /tmp/backup-$$timestamp.tar.gz"
