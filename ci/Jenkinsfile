@@ -34,7 +34,9 @@ pipeline {
         stage('Run container + smoke tests') {
             steps {
                 script {
-                    sh """
+                    sh  """
+                       docker rm -f myapp-test || true
+
                       docker run -d --name myapp-test -p 8081:8080 ${IMAGE_NAME}:${IMAGE_TAG}
                       sleep 5
                       echo "Running smoke tests..."
