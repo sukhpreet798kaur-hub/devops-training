@@ -38,7 +38,7 @@ pipeline {
                       docker run -d --name myapp-test -p 8081:8080 ${IMAGE_NAME}:${IMAGE_TAG}
                       sleep 5
                       echo "Running smoke tests..."
-                      curl -f http://localhost:8081/site/index.php\ || exit 1
+                      curl -f http://localhost:8081/site/index.php || exit 1
                     """
                 }
             }
