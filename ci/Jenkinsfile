@@ -1,6 +1,24 @@
 pipeline {
     agent any
 
+    parameters {
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['dev', 'staging', 'prod'],
+            description: 'Target environment'
+        )
+        string(
+            name: 'APP_VERSION',
+            defaultValue: '1.0.0',
+            description: 'Application version or tag'
+        )
+        booleanParam(
+            name: 'SIMULATE_FAILURE',
+            defaultValue: false,
+            description: 'If true, deliberately fail the pipeline'
+        )
+    }
+
     environment {
         IMAGE_NAME = "myapp"
         IMAGE_TAG  = "build-${env.BUILD_NUMBER}"
@@ -15,11 +33,21 @@ pipeline {
 
         stage('Lint') {
             steps {
-               sh '''
-                   echo "Running lint..."
-                   php -l app/site/index.php || true
-                   
-                   '''
+                echo "Running lint..."
+                // replace with your real lint command if you have one
+                sh 'php -l app/site/index.php || true'
+            }
+        }
+
+        stage('Simulate failure') {
+            steps {
+                script {
+                    if (params.SIMULATE_FAILURE) {
+                        error("SIMULATE_FAILURE is true, failing build on purpose.")
+                    } else {
+                        echo "SIMULATE_FAILURE is false, continuing normally."
+                    }
+                }
             }
         }
 
@@ -34,11 +62,12 @@ pipeline {
         stage('Run container + smoke tests') {
             steps {
                 script {
-                    sh  """
-                       docker rm -f myapp-test || true
+                    sh """
+                      docker rm -f myapp-test || true
 
                       docker run -d --name myapp-test -p 8081:8080 ${IMAGE_NAME}:${IMAGE_TAG}
                       sleep 5
+
                       echo "Running smoke tests..."
                       curl -f http://localhost:8081/ || exit 1
                     """
@@ -48,26 +77,25 @@ pipeline {
 
         stage('Archive artifacts') {
             steps {
-                // example: save logs and build info
                 sh 'mkdir -p build-info'
                 sh 'docker logs myapp-test > build-info/app.log || true'
-                sh 'echo "IMAGE=${IMAGE_NAME}:${IMAGE_TAG}" > build-info/build-info.txt'
+                sh "echo \"IMAGE=${IMAGE_NAME}:${IMAGE_TAG}\" > build-info/build-info.txt"
                 archiveArtifacts artifacts: 'build-info/**', fingerprint: true
             }
         }
     }
 
     post {
+        success {
+            echo "Build SUCCESS for ${env.JOB_NAME} #${env.BUILD_NUMBER} (ENV=${params.ENVIRONMENT}, VERSION=${params.APP_VERSION})"
+        }
+        failure {
+            echo "Build FAILED for ${env.JOB_NAME} #${env.BUILD_NUMBER} (ENV=${params.ENVIRONMENT}, VERSION=${params.APP_VERSION})"
+        }
         always {
             echo "Running cleanup..."
-
-            // stop and remove container (ignore errors)
             sh 'docker rm -f myapp-test || true'
-
-            // remove image to save space
             sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true"
-
-            // clean workspace
             cleanWs()
         }
     }
