@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+  db:
+    image: mysql:8.4
+    container_name: day10_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: trainingdb
+      MYSQL_USER: trainingapp
+      MYSQL_PASSWORD: TrainApp@2026#DB
+    ports:
+      - "3308:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ../app/db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uappuser -papppa"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  web:
+    build:
+      context: ..
+      dockerfile: ./docker/Dockerfile
+    container_name: day10_web
+    restart: unless-stopped
+    ports:
+      - "3005:8080"          # host 3005 -> container 8080 (PHP dev server)
+    volumes:
+      - ../app/site:/var/www/html
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: trainingapp
+      DB_PASSWORD: TrainApp@2026#DB
+      DB_NAME: trainingdb
+    depends_on:
+      db:
+        condition: service_healthy
+
+  adminer:
+    image: adminer
+    container_name: day10_adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"          # host 8080 -> container 8080 (Adminer)
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
