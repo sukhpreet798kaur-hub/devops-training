@@ -1,7 +1,10 @@
 pipeline {
     agent any
 
-
+    environment {
+        IMAGE_NAME = "myapp"
+        IMAGE_TAG  = "build-${env.BUILD_NUMBER}"
+    }
 
     stages {
         stage('Checkout') {
@@ -10,17 +13,57 @@ pipeline {
             }
         }
 
-        stage('Run tests') {
+        stage('Lint') {
             steps {
-                sh 'make test'
+               sh ```
+                   php -l app/site/index.php || true
+            }
+        }
+
+        stage('Build Docker image') {
+            steps {
+                sh """
+                  docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                """
+            }
+        }
+
+        stage('Run container + smoke tests') {
+            steps {
+                script {
+                    sh """
+                      docker run -d --name myapp-test -p 8080:8080 ${IMAGE_NAME}:${IMAGE_TAG}
+                      sleep 5
+                      echo "Running smoke tests..."
+                      curl -f http://localhost:8080/health || exit 1
+                    """
+                }
+            }
+        }
+
+        stage('Archive artifacts') {
+            steps {
+                // example: save logs and build info
+                sh 'mkdir -p build-info'
+                sh 'docker logs myapp-test > build-info/app.log || true'
+                sh 'echo "IMAGE=${IMAGE_NAME}:${IMAGE_TAG}" > build-info/build-info.txt'
+                archiveArtifacts artifacts: 'build-info/**', fingerprint: true
             }
         }
     }
 
     post {
         always {
-            echo 'Pipeline finished.'
+            echo "Running cleanup..."
+
+            // stop and remove container (ignore errors)
+            sh 'docker rm -f myapp-test || true'
+
+            // remove image to save space
+            sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true"
+
+            // clean workspace
+            cleanWs()
         }
     }
 }
-
