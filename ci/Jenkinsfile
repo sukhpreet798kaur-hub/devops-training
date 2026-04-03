@@ -15,10 +15,11 @@ pipeline {
 
         stage('Lint') {
             steps {
-               sh ```
+               sh '''
+                   echo "Running lint..."
                    php -l app/site/index.php || true
                    
-                   ```
+                   '''
             }
         }
 
