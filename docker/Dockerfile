@@ -25,4 +25,4 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD curl -f http://localhost:8080/health || exit 1
 
 # 9) Start PHP built-in server on 0.0.0.0:8080
-CMD ["php", "-S", "0.0.0.0:8080", "-t", "/var/www/html"]
+CMD ["php", "-S", "0.0.0.0:8080", "-t", "/app/site"]
