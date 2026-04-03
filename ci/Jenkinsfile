@@ -17,6 +17,8 @@ pipeline {
             steps {
                sh ```
                    php -l app/site/index.php || true
+                   
+                   ```
             }
         }
 
