@@ -2,8 +2,8 @@ pipeline {
   agent any
 
   environment {
-    IMAGE_NAME    = "myapp"              // local image name
-    APP_HOST_DEV  = "myapp-dev.local"   // ingress host for dev
+    IMAGE_NAME    = "myapp"            // image name
+    APP_HOST_DEV  = "myapp-dev.local"  // ingress host for dev
     NAMESPACE_DEV = "dev"
     RELEASE_DEV   = "myapp-dev"
   }
@@ -15,16 +15,14 @@ pipeline {
       }
     }
 
-    stage('Set Image Tag') {
+    stage('Build Image (local)') {
       steps {
         script {
-          // Use a build-based tag, or keep "local" if you always reuse the same
           def tag = "build-${env.BUILD_NUMBER}"
           env.IMAGE_TAG = tag
 
-          // If your local image is tagged as myapp:local and you want build-XX:
           sh """
-            docker tag ${IMAGE_NAME}:local ${IMAGE_NAME}:${tag}
+            docker build -f docker/Dockerfile -t ${IMAGE_NAME}:${tag} .
           """
         }
       }
