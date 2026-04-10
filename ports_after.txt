@@ -1,6 +1,0 @@
-tcp   LISTEN 0      4096       127.0.0.1:44225      0.0.0.0:*    users:(("containerd",pid=240,fd=9)) ino:2814 sk:5 cgroup:/system.slice/containerd.service <->                    
-tcp   LISTEN 0      151        127.0.0.1:3306       0.0.0.0:*    users:(("mysqld",pid=354,fd=33)) uid:105 ino:627 sk:6 cgroup:/system.slice/mysql.service <->                     
-tcp   LISTEN 0      4096   127.0.0.53%lo:53         0.0.0.0:*    users:(("systemd-resolve",pid=160,fd=15)) uid:991 ino:1827 sk:7 cgroup:/system.slice/systemd-resolved.service <->
-tcp   LISTEN 0      4096      127.0.0.54:53         0.0.0.0:*    users:(("systemd-resolve",pid=160,fd=17)) uid:991 ino:1829 sk:8 cgroup:/system.slice/systemd-resolved.service <->
-tcp   LISTEN 0      70         127.0.0.1:33060      0.0.0.0:*    users:(("mysqld",pid=354,fd=32)) uid:105 ino:2959 sk:9 cgroup:/system.slice/mysql.service <->                    
-tcp   LISTEN 0      511                *:80               *:*    users:(("apache2",pid=303,fd=4),("apache2",pid=302,fd=4),("apache2",pid=301,fd=4),("apache2",pid=300,fd=4),("apache2",pid=299,fd=4),("apache2",pid=289,fd=4)) ino:5357 sk:a cgroup:/system.slice/apache2.service v6only:0 <->
