@@ -1,0 +1,28 @@
+# values-prod.yaml
+env:
+  name: prod
+
+replicaCount: 3
+
+livenessProbe:
+  enabled: true
+
+readinessProbe:
+  enabled: true
+
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - host: myapp-pro.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+
+configMap:
+  APP_ENV: "production"
+  APP_VERSION: "local"
+  APP_NAME: "myapp"
+  LOG_LEVEL: "debug"
+  MAX_CONNECTIONS: "10"

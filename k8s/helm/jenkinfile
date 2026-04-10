@@ -1,0 +1,81 @@
+pipeline {
+  agent any
+
+  environment {
+    IMAGE_NAME    = "myapp"              // local image name
+    APP_HOST_DEV  = "myapp-dev.local"   // ingress host for dev
+    NAMESPACE_DEV = "dev"
+    RELEASE_DEV   = "myapp-dev"
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Set Image Tag') {
+      steps {
+        script {
+          // Use a build-based tag, or keep "local" if you always reuse the same
+          def tag = "build-${env.BUILD_NUMBER}"
+          env.IMAGE_TAG = tag
+
+          // If your local image is tagged as myapp:local and you want build-XX:
+          sh """
+            docker tag ${IMAGE_NAME}:local ${IMAGE_NAME}:${tag}
+          """
+        }
+      }
+    }
+
+    stage('Helm Upgrade (dev)') {
+      steps {
+        script {
+          sh """
+            helm upgrade --install ${RELEASE_DEV} ./helm \
+              --namespace ${NAMESPACE_DEV} \
+              --create-namespace \
+              -f helm/values-dev.yaml \
+              --set image.repository=${IMAGE_NAME} \
+              --set image.tag=${IMAGE_TAG}
+          """
+        }
+      }
+    }
+
+    stage('Wait for Rollout') {
+      steps {
+        script {
+          sh """
+            kubectl rollout status deployment/${RELEASE_DEV}-helm \
+              -n ${NAMESPACE_DEV} --timeout=60s
+          """
+        }
+      }
+    }
+
+    stage('Smoke Test via Ingress') {
+      steps {
+        script {
+          sh """
+            curl -fsS http://${APP_HOST_DEV}/ || exit 1
+          """
+        }
+      }
+    }
+  }
+
+  post {
+    failure {
+      script {
+        echo "Deployment or smoke tests FAILED, rolling back dev..."
+        sh """
+          PREV=\$(helm history ${RELEASE_DEV} -n ${NAMESPACE_DEV} -o json | jq -r '.[-2].revision')
+          helm rollback ${RELEASE_DEV} \${PREV} -n ${NAMESPACE_DEV} --wait
+        """
+      }
+    }
+  }
+}

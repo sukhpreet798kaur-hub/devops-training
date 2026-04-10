@@ -1,0 +1,29 @@
+# values-dev.yaml
+env:
+  name: dev
+
+replicaCount: 1
+
+livenessProbe:
+  enabled: true
+
+readinessProbe:
+  enabled: true
+
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - host: myapp-dev.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+
+configMap:
+  APP_ENV: "development"
+  APP_VERSION: "local"
+  APP_NAME: "myapp"
+  LOG_LEVEL: "debug"
+  MAX_CONNECTIONS: "10"
+
