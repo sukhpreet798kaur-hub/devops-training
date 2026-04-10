@@ -1,102 +1,81 @@
 pipeline {
-    agent any
+  agent any
 
-    parameters {
-        choice(
-            name: 'ENVIRONMENT',
-            choices: ['dev', 'staging', 'prod'],
-            description: 'Target environment'
-        )
-        string(
-            name: 'APP_VERSION',
-            defaultValue: '1.0.0',
-            description: 'Application version or tag'
-        )
-        booleanParam(
-            name: 'SIMULATE_FAILURE',
-            defaultValue: false,
-            description: 'If true, deliberately fail the pipeline'
-        )
+  environment {
+    IMAGE_NAME    = "myapp"              // local image name
+    APP_HOST_DEV  = "myapp-dev.local"   // ingress host for dev
+    NAMESPACE_DEV = "dev"
+    RELEASE_DEV   = "myapp-dev"
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
     }
 
-    environment {
-        IMAGE_NAME = "myapp"
-        IMAGE_TAG  = "build-${env.BUILD_NUMBER}"
+    stage('Set Image Tag') {
+      steps {
+        script {
+          // Use a build-based tag, or keep "local" if you always reuse the same
+          def tag = "build-${env.BUILD_NUMBER}"
+          env.IMAGE_TAG = tag
+
+          // If your local image is tagged as myapp:local and you want build-XX:
+          sh """
+            docker tag ${IMAGE_NAME}:local ${IMAGE_NAME}:${tag}
+          """
+        }
+      }
     }
 
-    stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
+    stage('Helm Upgrade (dev)') {
+      steps {
+        script {
+          sh """
+            helm upgrade --install ${RELEASE_DEV} ./helm \
+              --namespace ${NAMESPACE_DEV} \
+              --create-namespace \
+              -f helm/values-dev.yaml \
+              --set image.repository=${IMAGE_NAME} \
+              --set image.tag=${IMAGE_TAG}
+          """
         }
-
-        stage('Lint') {
-            steps {
-                echo "Running lint..."
-                // replace with your real lint command if you have one
-                sh 'php -l app/site/index.php || true'
-            }
-        }
-
-        stage('Simulate failure') {
-            steps {
-                script {
-                    if (params.SIMULATE_FAILURE) {
-                        error("SIMULATE_FAILURE is true, failing build on purpose.")
-                    } else {
-                        echo "SIMULATE_FAILURE is false, continuing normally."
-                    }
-                }
-            }
-        }
-
-        stage('Build Docker image') {
-            steps {
-                sh """
-                  docker build -f docker/Dockerfile -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                """
-            }
-        }
-
-        stage('Run container + smoke tests') {
-            steps {
-                script {
-                    sh """
-                      docker rm -f myapp-test || true
-
-                      docker run -d --name myapp-test -p 8081:8080 ${IMAGE_NAME}:${IMAGE_TAG}
-                      sleep 5
-
-                      echo "Running smoke tests..."
-                      curl -f http://localhost:8081/ || exit 1
-                    """
-                }
-            }
-        }
-
-        stage('Archive artifacts') {
-            steps {
-                sh 'mkdir -p build-info'
-                sh 'docker logs myapp-test > build-info/app.log || true'
-                sh "echo \"IMAGE=${IMAGE_NAME}:${IMAGE_TAG}\" > build-info/build-info.txt"
-                archiveArtifacts artifacts: 'build-info/**', fingerprint: true
-            }
-        }
+      }
     }
 
-    post {
-        success {
-            echo "Build SUCCESS for ${env.JOB_NAME} #${env.BUILD_NUMBER} (ENV=${params.ENVIRONMENT}, VERSION=${params.APP_VERSION})"
+    stage('Wait for Rollout') {
+      steps {
+        script {
+          sh """
+            kubectl rollout status deployment/${RELEASE_DEV}-helm \
+              -n ${NAMESPACE_DEV} --timeout=60s
+          """
         }
-        failure {
-            echo "Build FAILED for ${env.JOB_NAME} #${env.BUILD_NUMBER} (ENV=${params.ENVIRONMENT}, VERSION=${params.APP_VERSION})"
-        }
-        always {
-            echo "Running cleanup..."
-            sh 'docker rm -f myapp-test || true'
-            sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true"
-            cleanWs()
-        }
+      }
     }
+
+    stage('Smoke Test via Ingress') {
+      steps {
+        script {
+          sh """
+            curl -fsS http://${APP_HOST_DEV}/ || exit 1
+          """
+        }
+      }
+    }
+  }
+
+  post {
+    failure {
+      script {
+        echo "Deployment or smoke tests FAILED, rolling back dev..."
+        sh """
+          PREV=\$(helm history ${RELEASE_DEV} -n ${NAMESPACE_DEV} -o json | jq -r '.[-2].revision')
+          helm rollback ${RELEASE_DEV} \${PREV} -n ${NAMESPACE_DEV} --wait
+        """
+      }
+    }
+  }
 }
