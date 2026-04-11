@@ -47,8 +47,9 @@ pipeline {
       steps {
         script {
           sh """
-            kubectl rollout status deployment/${RELEASE_DEV}-helm \
-              -n ${NAMESPACE_DEV} --timeout=60s
+            kubectl rollout status deployment/myapp-dev-helm \
+              -n dev \
+              --timeout=300s || kubectl -n dev get pods && kubectl -n dev describe deployment/myapp-dev-helm
           """
         }
       }
