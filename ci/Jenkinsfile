@@ -58,7 +58,7 @@ pipeline {
     stage('Smoke Test via Ingress') {
       steps {
           sh """
-             sh 'curl -fsS http://${APP_HOST_DEV}/'  
+             sh "curl -fsS http://${APP_HOST_DEV}/"  
           """
         }
       }
