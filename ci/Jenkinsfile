@@ -47,9 +47,10 @@ pipeline {
       steps {
         script {
           sh """
+            set -e
             kubectl rollout status deployment/myapp-dev-helm \
-              -n dev \
-              --timeout=300s || kubectl -n dev get pods && kubectl -n dev describe deployment/myapp-dev-helm
+              -n ${NAMESPACE_DEV} \
+              --timeout=300s
           """
         }
       }
@@ -57,19 +58,22 @@ pipeline {
 
     stage('Smoke Test via Ingress') {
       steps {
-          sh """
-             sh "curl -fsS http://${APP_HOST_DEV}/"  
-          """
+        script {
+          // if you really have ingress + DNS for APP_HOST_DEV
+          sh "curl -fsS http://${APP_HOST_DEV}/"
         }
       }
+    }
+  }
 
   post {
     failure {
       script {
         echo "Deployment or smoke tests FAILED, rolling back dev..."
         sh """
-          PREV=\$(helm history ${RELEASE_DEV} -n ${NAMESPACE_DEV} -o json | jq -r '.[-2].revision')
-          helm rollback ${RELEASE_DEV} \${PREV} -n ${NAMESPACE_DEV} --wait
+          set -e
+          PREV=$(helm history ${RELEASE_DEV} -n ${NAMESPACE_DEV} -o json | jq -r '.[-2].revision')
+          helm rollback ${RELEASE_DEV} ${PREV} -n ${NAMESPACE_DEV} --wait
         """
       }
     }
