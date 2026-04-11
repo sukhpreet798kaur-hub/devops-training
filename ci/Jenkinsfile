@@ -67,15 +67,13 @@ pipeline {
   }
 
   post {
-    failure {
-      script {
-        echo "Deployment or smoke tests FAILED, rolling back dev..."
-        sh """
-          set -e
-          PREV=$(helm history ${RELEASE_DEV} -n ${NAMESPACE_DEV} -o json | jq -r '.[-2].revision')
-          helm rollback ${RELEASE_DEV} ${PREV} -n ${NAMESPACE_DEV} --wait
-        """
-      }
+  failure {
+    script {
+      echo "Deployment or smoke tests FAILED, rolling back dev..."
+      sh """
+        set -e
+        helm rollback ${RELEASE_DEV} 0 -n ${NAMESPACE_DEV} --wait
+      """
     }
   }
 }
