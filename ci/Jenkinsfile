@@ -31,14 +31,14 @@ pipeline {
     stage('Helm Upgrade (dev)') {
       steps {
         script {
-          sh """
-            helm upgrade --install ${RELEASE_DEV} k8s/helm \
-              --namespace ${NAMESPACE_DEV} \
+          sh '''
+            helm upgrade --install '"${RELEASE_DEV}"' k8s/helm \
+              --namespace '"${NAMESPACE_DEV}"' \
               --create-namespace \
               -f k8s/helm/values-dev.yaml \
-              --set image.repository=${IMAGE_NAME} \
-              --set image.tag=${IMAGE_TAG}
-          """
+              --set image.repository='"${IMAGE_NAME}"' \
+              --set image.tag='"${IMAGE_TAG}"'
+          '''
         }
       }
     }
@@ -46,12 +46,12 @@ pipeline {
     stage('Wait for Rollout') {
       steps {
         script {
-          sh """
+          sh '''
             set -e
             kubectl rollout status deployment/myapp-dev-helm \
-              -n ${NAMESPACE_DEV} \
+              -n '"${NAMESPACE_DEV}"' \
               --timeout=300s
-          """
+          '''
         }
       }
     }
@@ -59,7 +59,6 @@ pipeline {
     stage('Smoke Test via Ingress') {
       steps {
         script {
-          // if you really have ingress + DNS for APP_HOST_DEV
           sh "curl -fsS http://${APP_HOST_DEV}/"
         }
       }
@@ -67,13 +66,14 @@ pipeline {
   }
 
   post {
-  failure {
-    script {
-      echo "Deployment or smoke tests FAILED, rolling back dev..."
-      sh """
-        set -e
-        helm rollback ${RELEASE_DEV} 0 -n ${NAMESPACE_DEV} --wait
-      """
+    failure {
+      script {
+        echo "Deployment or smoke tests FAILED, rolling back dev..."
+        sh '''
+          set -e
+          helm rollback '"${RELEASE_DEV}"' 0 -n '"${NAMESPACE_DEV}"' --wait
+        '''
+      }
     }
   }
 }
