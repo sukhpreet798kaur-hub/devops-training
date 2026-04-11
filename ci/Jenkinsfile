@@ -59,7 +59,15 @@ pipeline {
       steps {
         script {
           sh """
-            curl -fsS http://${APP_HOST_DEV}/ || exit 1
+             kubectl -n dev port-forward svc/myapp-dev-helm 8080:80 >/tmp/pf.log 2>&1 &
+        PF_PID=$!
+        sleep 5
+
+        # Health check
+        curl -fsS http://127.0.0.1:8080/ || { echo "Health check failed"; kill $PF_PID; exit 1; }
+
+        # Cleanup
+        kill $PF_PID  
           """
         }
       }
