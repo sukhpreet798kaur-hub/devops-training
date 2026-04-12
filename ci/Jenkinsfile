@@ -50,7 +50,7 @@ pipeline {
             set -e
             kubectl rollout status deployment/myapp-dev-helm \
               -n ${NAMESPACE_DEV} \
-              --timeout=300s
+              --timeout=600s
             STATUS=\$?
 
             echo "=== Pods ==="
