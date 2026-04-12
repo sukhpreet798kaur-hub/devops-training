@@ -47,7 +47,9 @@ pipeline {
       steps {
         script {
           sh """
-            set -e
+            set +e
+            echo "Waiting for deployment/myapp-dev-helm to be available..."
+
             kubectl rollout status deployment/myapp-dev-helm \
               -n ${NAMESPACE_DEV} \
               --timeout=600s
