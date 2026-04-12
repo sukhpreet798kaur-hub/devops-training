@@ -24,7 +24,7 @@ pipeline {
           sh """
             eval \$(minikube docker-env)
            cd ${env.WORKSPACE}/docker
-           docker build -t ${IMAGE_NAME}:${tag} .
+           docker/Dockerfile build -t ${IMAGE_NAME}:${tag} .
           """
         }
       }
