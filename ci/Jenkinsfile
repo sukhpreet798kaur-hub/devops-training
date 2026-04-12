@@ -51,6 +51,18 @@ pipeline {
             kubectl rollout status deployment/myapp-dev-helm \
               -n ${NAMESPACE_DEV} \
               --timeout=300s
+            STATUS=\$?
+
+            echo "=== Pods ==="
+            kubectl -n ${NAMESPACE_DEV} get pods
+
+            echo "=== Deployment conditions ==="
+            kubectl -n ${NAMESPACE_DEV} describe deployment myapp-dev-helm | sed -n '/Conditions:/,/Events:/p'
+
+            if [ \$STATUS -ne 0 ]; then
+              echo "Rollout status failed, see details above"
+              exit \$STATUS
+            fi
           """
         }
       }
