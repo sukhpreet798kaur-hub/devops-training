@@ -9,20 +9,25 @@ pipeline {
   }
 
   stages {
+
     stage('Checkout') {
       steps {
         checkout scm
       }
     }
+
+    // 1) Secret scanning stage (DevSecOps)
     stage('Secret scan') {
       steps {
         sh '''
-          echo "Running Gitleaks secret scan..."
-          gitleaks detect --source . --exit-code 1
+          echo "Running Gitleaks secret scan via Docker..."
+          docker run --rm -v ${WORKSPACE}:/repo gitleaks/gitleaks:latest \
+            detect --source /repo --exit-code 1
         '''
       }
     }
 
+    // 2) Build Docker image locally
     stage('Build Image (local)') {
       steps {
         script {
@@ -30,47 +35,51 @@ pipeline {
           env.IMAGE_TAG = tag
 
           sh """
-             docker build -f docker/Dockerfile -t ${IMAGE_NAME}:${tag} .
+            docker build -f docker/Dockerfile -t ${IMAGE_NAME}:${tag} .
           """
         }
       }
     }
 
+    // 3) Deploy to dev using Helm
     stage('Helm Upgrade (dev)') {
       steps {
-        script {
-          sh """
-        helm upgrade --install ${RELEASE_DEV} ./k8s/helm \
-          --namespace ${NAMESPACE_DEV} \
-          --create-namespace \
-          -f k8s/helm/values-dev.yaml \
-          --set image.repository=${IMAGE_NAME} \
-          --set image.tag=${IMAGE_TAG}
-      """
-        }
+        sh """
+          echo "PWD is: \$(pwd)"
+          echo "Top-level:"
+          ls
+
+          helm upgrade --install ${RELEASE_DEV} ./k8s/helm \
+            --namespace ${NAMESPACE_DEV} \
+            --create-namespace \
+            -f k8s/helm/values-dev.yaml \
+            --set image.repository=${IMAGE_NAME} \
+            --set image.tag=${IMAGE_TAG}
+        """
       }
     }
 
+    // 4) Wait for rollout
     stage('Wait for Rollout') {
       steps {
-        script {
-          sh """
-            set -e
-            echo "Waiting for deployment/myapp-dev-helm to be available..."
+        sh """
+          set -e
+          echo "Waiting for deployment/myapp-dev-helm to be available..."
 
-            kubectl -n dev wait \
-              --for=condition=available deployment/myapp-dev-helm \
-              --timeout=600s
-          """
-        }
+          kubectl -n ${NAMESPACE_DEV} wait \
+            --for=condition=available deployment/myapp-dev-helm \
+            --timeout=600s
+        """
       }
     }
 
+    // 5) Simple smoke test via ingress
     stage('Smoke Test via Ingress') {
       steps {
-        script {
-          sh "curl -fsS http://${APP_HOST_DEV}/"
-        }
+        sh """
+          echo "Running smoke test against http://${APP_HOST_DEV}/"
+          curl -fsS http://${APP_HOST_DEV}/
+        """
       }
     }
   }
@@ -79,10 +88,10 @@ pipeline {
     failure {
       script {
         echo "Deployment or smoke tests FAILED, rolling back dev..."
-        sh '''
+        sh """
           set -e
-          helm rollback '"${RELEASE_DEV}"' 0 -n '"${NAMESPACE_DEV}"' --wait
-        '''
+          helm rollback ${RELEASE_DEV} 0 -n ${NAMESPACE_DEV} --wait
+        """
       }
     }
   }
