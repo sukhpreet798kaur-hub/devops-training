@@ -38,7 +38,7 @@ pipeline {
 
     stage('Helm Upgrade (dev)') {
       steps {
-        script {
+        dir('devops') {
           sh """
         helm upgrade --install ${RELEASE_DEV} ./k8s/helm \
           --namespace ${NAMESPACE_DEV} \
