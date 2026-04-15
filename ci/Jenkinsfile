@@ -14,6 +14,14 @@ pipeline {
         checkout scm
       }
     }
+    stage('Secret scan') {
+      steps {
+        sh '''
+          echo "Running Gitleaks secret scan..."
+          gitleaks detect --source . --exit-code 1
+        '''
+      }
+    }
 
     stage('Build Image (local)') {
       steps {
