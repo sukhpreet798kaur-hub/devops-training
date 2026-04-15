@@ -40,7 +40,7 @@ pipeline {
       steps {
         script {
           sh """
-        helm upgrade --install ${RELEASE_DEV} k8s/helm \
+        helm upgrade --install ${RELEASE_DEV} ./k8s/helm \
           --namespace ${NAMESPACE_DEV} \
           --create-namespace \
           -f k8s/helm/values-dev.yaml \
