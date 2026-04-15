@@ -43,21 +43,17 @@ pipeline {
 
     // 3) Deploy to dev using Helm
     stage('Helm Upgrade (dev)') {
-      steps {
-        sh """
-          echo "PWD is: \$(pwd)"
-          echo "Top-level:"
-          ls
-
-          helm upgrade --install ${RELEASE_DEV} ./k8s/helm \
-            --namespace ${NAMESPACE_DEV} \
-            --create-namespace \
-            -f k8s/helm/values-dev.yaml \
-            --set image.repository=${IMAGE_NAME} \
-            --set image.tag=${IMAGE_TAG}
-        """
-      }
-    }
+  steps {
+    sh """
+      helm upgrade --install myapp-dev ./k8s/helm \
+        --namespace dev \
+        --create-namespace \
+        -f k8s/helm/values-dev.yaml \
+        --set image.repository=myapp \
+        --set image.tag=build-${env.BUILD_NUMBER}
+    """
+  }
+}
 
     // 4) Wait for rollout
     stage('Wait for Rollout') {
