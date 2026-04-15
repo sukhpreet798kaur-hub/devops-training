@@ -38,13 +38,12 @@ pipeline {
 
     stage('Helm Upgrade (dev)') {
       steps {
-
+        script {
           sh """
-            cd k8s
-        helm upgrade --install ${RELEASE_DEV} ./helm \
+        helm upgrade --install ${RELEASE_DEV} k8s/helm \
           --namespace ${NAMESPACE_DEV} \
           --create-namespace \
-          -f helm/values-dev.yaml \
+          -f k8s/helm/values-dev.yaml \
           --set image.repository=${IMAGE_NAME} \
           --set image.tag=${IMAGE_TAG}
       """
