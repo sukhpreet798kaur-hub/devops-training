@@ -22,22 +22,23 @@ pipeline {
         sh '''
           echo "files in repo:"
           ls
+
           echo "Showing dummy_secret.txt:"
           if [ -f dummy_secret.txt ]; then
             cat dummy_secret.txt
           else
-           echo "dummy_secret.txt NOT FOUND"
-         fi
+            echo "dummy_secret.txt NOT FOUND"
+          fi
 
-         echo "Running simple secret pattern scan..."
-         # Fail if any file contains our dummy pattern or common secret words
-         if grep -RiE "DUMMY_PASSWORD|SuperSecretTest123|password|secret|api_key" . ; then
-           echo "Potential secret found! Failing the build."
-           exit 1
-         else
-           echo "No obvious secrets found."
-         fi
-       '''
+          echo "Running simple secret pattern scan..."
+          # Fail if any file contains our dummy pattern or common secret words
+          if grep -RiE "DUMMY_PASSWORD|SuperSecretTest123|password|secret|api_key" . ; then
+            echo "Potential secret found! Failing the build."
+            exit 1
+          else
+            echo "No obvious secrets found."
+          fi
+        '''
       }
     }
 
@@ -59,13 +60,13 @@ pipeline {
     stage('Helm Upgrade (dev)') {
       steps {
         sh """
-          echo ">>> NEW HELM STAGE <<<"     
+          echo ">>> NEW HELM STAGE <<<"
 
-          helm upgrade --install ${RELEASE_DEV} ./k8s/helm \
-            --namespace ${NAMESPACE_DEV} \
-            --create-namespace \
-            -f k8s/helm/values-dev.yaml \
-            --set image.repository=${IMAGE_NAME} \
+          helm upgrade --install ${RELEASE_DEV} ./k8s/helm \\
+            --namespace ${NAMESPACE_DEV} \\
+            --create-namespace \\
+            -f k8s/helm/values-dev.yaml \\
+            --set image.repository=${IMAGE_NAME} \\
             --set image.tag=${IMAGE_TAG}
         """
       }
@@ -78,8 +79,8 @@ pipeline {
           set -e
           echo "Waiting for deployment/myapp-dev-helm to be available..."
 
-          kubectl -n ${NAMESPACE_DEV} wait \
-            --for=condition=available deployment/myapp-dev-helm \
+          kubectl -n ${NAMESPACE_DEV} wait \\
+            --for=condition=available deployment/myapp-dev-helm \\
             --timeout=600s
         """
       }
