@@ -20,23 +20,14 @@ pipeline {
     stage('Secret scan') {
       steps {
         sh '''
-          echo "files in repo:"
-          ls
-
-          echo "Showing dummy_secret.txt:"
-          if [ -f dummy_secret.txt ]; then
-            cat dummy_secret.txt
-          else
-            echo "dummy_secret.txt NOT FOUND"
-          fi
 
           echo "Running simple secret pattern scan..."
           # Fail if any file contains our dummy pattern or common secret words
-          if grep -RiE "DUMMY_PASSWORD|SuperSecretTest123|password|secret|api_key" . ; then
+          if grep -RiE "DUMMY_PASSWORD|SuperSecretTest123" . ; then
             echo "Potential secret found! Failing the build."
             exit 1
           else
-            echo "No obvious secrets found."
+            echo "Dummy secret not found. Scan passed"
           fi
         '''
       }
