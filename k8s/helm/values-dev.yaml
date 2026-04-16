@@ -27,3 +27,10 @@ configMap:
   LOG_LEVEL: "debug"
   MAX_CONNECTIONS: "10"
 
+# NEW: container env vars that come from secrets
+envVars:
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: db-secret
+        key: password

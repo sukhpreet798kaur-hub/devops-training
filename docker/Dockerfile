@@ -10,4 +10,4 @@ USER appuser
 EXPOSE 8080
 
 # IMPORTANT: -t must point to folder with index.php
-CMD ["php", "-S", "0.0.0.0:8080", "-t", "/app/app/site"]
+CMD ["php", "-S", "0.0.0.0:8080", "-t", "/app"]
