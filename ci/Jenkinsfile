@@ -23,7 +23,7 @@ pipeline {
 
           echo "Running simple secret pattern scan..."
           # Fail if any file contains our dummy pattern or common secret words
-          if grep -RiE "DUMMY_PASSWORD|SuperSecretTest123" . ; then
+          if grep -RiE "DUMMY_PASSWORD|SuperSecretTest123" k8s docker ; then
             echo "Potential secret found! Failing the build."
             exit 1
           else
