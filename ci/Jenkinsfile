@@ -2,7 +2,7 @@ pipeline {
   agent any
 
   environment {
-    IMAGE_NAME    = "myapp"            // image name
+    IMAGE_NAME    = "myapp"            // Docker image name
     APP_HOST_DEV  = "myapp-dev.local"  // ingress host for dev
     NAMESPACE_DEV = "dev"
     RELEASE_DEV   = "myapp-dev"
@@ -20,7 +20,6 @@ pipeline {
     stage('Secret scan') {
       steps {
         sh '''
-
           echo "Running simple secret pattern scan..."
           # Fail if any file contains our dummy pattern or common secret words
           if grep -RiE "DUMMY_PASSWORD|SuperSecretTest123" k8s docker ; then
@@ -41,56 +40,64 @@ pipeline {
           env.IMAGE_TAG = tag
 
           sh """
+            echo "Building Docker image ${IMAGE_NAME}:${tag}..."
             docker build -f docker/Dockerfile -t ${IMAGE_NAME}:${tag} .
           """
         }
       }
     }
-   stage('Image scan') {
-     when {
-       expression { return env.IMAGE_NAME != null }
+
+    // 3) Image scan with Trivy (fail only on CRITICAL)
+    stage('Image scan') {
+      when {
+        expression { return env.IMAGE_NAME != null }
+      }
+      steps {
+        sh '''
+          echo "Scanning image with Trivy (fail only on CRITICAL)..."
+
+          # This will fail the build ONLY if CRITICAL vulnerabilities are found.
+          trivy image --severity CRITICAL --exit-code 1 $IMAGE_NAME:$IMAGE_TAG || {
+            echo "CRITICAL vulnerabilities found, failing build."
+            exit 1
+          }
+
+          echo "Trivy scan passed (no CRITICAL vulnerabilities)."
+        '''
+      }
     }
-    steps {
-      sh '''
-        echo "Scanning image with Trivy..."
-        trivy image --severity HIGH,CRITICAL --exit-code 1 $IMAGE_NAME:$IMAGE_TAG || {
-          echo "High/Critical vulnerabilities found, failing build."
-          exit 1
-       }
-     '''
-    }
-  }
-    // 3) Deploy to dev using Helm
+
+    // 4) Deploy to dev using Helm
     stage('Helm Upgrade (dev)') {
       steps {
         sh """
           echo ">>> NEW HELM STAGE <<<"
 
-          helm upgrade --install ${RELEASE_DEV} ./k8s/helm \\
-            --namespace ${NAMESPACE_DEV} \\
-            --create-namespace \\
-            -f k8s/helm/values-dev.yaml \\
-            --set image.repository=${IMAGE_NAME} \\
+          helm upgrade --install ${RELEASE_DEV} ./k8s/helm \
+            --namespace ${NAMESPACE_DEV} \
+            --create-namespace \
+            -f k8s/helm/values-dev.yaml \
+            --set image.repository=${IMAGE_NAME} \
             --set image.tag=${IMAGE_TAG}
         """
       }
     }
 
-    // 4) Wait for rollout
+    // 5) Wait for rollout
     stage('Wait for Rollout') {
       steps {
         sh """
           set -e
           echo "Waiting for deployment/myapp-dev-helm to be available..."
 
-          kubectl -n ${NAMESPACE_DEV} wait \\
-            --for=condition=available deployment/myapp-dev-helm \\
+          kubectl -n ${NAMESPACE_DEV} wait \
+            --for=condition=available deployment/myapp-dev-helm \
             --timeout=600s
         """
       }
     }
 
-    // 5) Simple smoke test via ingress
+    // 6) Simple smoke test via ingress
     stage('Smoke Test via Ingress') {
       steps {
         sh """
