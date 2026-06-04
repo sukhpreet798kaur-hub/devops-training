@@ -1,0 +1,19 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'sukhpreet798kaur@gmail.com'
+  smtp_auth_username: 'sukhpreet798kaur@gmail.com'
+  smtp_auth_password: 'eebv wvel qtkw fany'
+
+route:
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 1h
+  receiver: 'email-alert'
+
+receivers:
+  - name: 'email-alert'
+    email_configs:
+      - to: 'sukhpreet.kaur@solutionara.in'
+        send_resolved: true

@@ -1,0 +1,322 @@
+# Linux Package Installation Troubleshooting Runbook
+
+## Overview
+
+This runbook documents a common real-world operations scenario: SSH access to a Linux server works, but package installation fails when trying to install software such as Nginx or other applications. In production environments, this usually indicates a problem with permissions, repositories, network access, package manager state, storage, or enterprise policy rather than a problem with SSH itself.[1][2][3]
+
+## Problem statement
+
+A system administrator or DevOps engineer can log in to a server over SSH, but package installation commands such as `apt install nginx`, `yum install nginx`, or `dnf install nginx` do not work. This situation is common in enterprise Linux environments because SSH access and package-management readiness are separate concerns.[4][3]
+
+## Typical root causes
+
+### 1. Insufficient privileges
+
+The logged-in user may not have root or sudo privileges, so package installation fails with permission or lock-file errors. In managed enterprise environments, SSH access is often granted without unrestricted administrative rights.[4][3]
+
+Common checks:
+
+```bash
+whoami
+id
+sudo -l
+```
+
+Typical fix:
+
+```bash
+sudo apt update
+sudo apt install -y nginx
+```
+
+If sudo access is not granted, the correct enterprise response is to request the required privilege through the approved access-control process rather than trying to bypass policy.[3]
+
+### 2. Wrong package manager or wrong operating system family
+
+Package installation can fail because the administrator is using `apt` on a RHEL-family host or `yum`/`dnf` on a Debian-family host. Mixed fleets make this a common operational mistake.[2][4]
+
+Checks:
+
+```bash
+cat /etc/os-release
+uname -a
+```
+
+Correct package-manager usage:
+
+```bash
+# Ubuntu / Debian
+sudo apt update
+sudo apt install -y nginx
+
+# RHEL / Rocky / AlmaLinux / CentOS Stream
+sudo dnf install -y nginx
+
+# Amazon Linux
+sudo yum install -y nginx
+```
+
+### 3. Repository or mirror misconfiguration
+
+Package installation frequently fails because configured repositories are broken, malformed, outdated, disabled, or pointing to the wrong release. Third-party repositories are especially common failure points in production systems.[1][5][6]
+
+Ubuntu and Debian checks:
+
+```bash
+sudo apt update
+grep -R "^deb" /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null
+cat /etc/apt/sources.list
+ls -l /etc/apt/sources.list.d/
+```
+
+Ubuntu and Debian fixes:
+
+```bash
+sudo rm -rf /var/lib/apt/lists/*
+sudo apt clean
+sudo apt update
+```
+
+Disable a broken third-party repository temporarily:
+
+```bash
+sudo mv /etc/apt/sources.list.d/brokenrepo.list /etc/apt/sources.list.d/brokenrepo.list.disabled
+sudo apt update
+```
+
+RHEL-family checks:
+
+```bash
+sudo yum repolist
+sudo dnf repolist
+ls -l /etc/yum.repos.d/
+cat /etc/yum.repos.d/*.repo
+```
+
+RHEL-family fixes:
+
+```bash
+sudo yum clean all
+sudo yum makecache
+
+sudo dnf clean all
+sudo dnf makecache
+```
+
+### 4. DNS, internet egress, firewall, or proxy issue
+
+In many enterprise networks, a server can be reached through SSH but cannot access public repositories because outbound internet is blocked, DNS is misconfigured, or a corporate proxy is required. This is one of the most common production causes of package-install failure.[1][3]
+
+Checks:
+
+```bash
+ping -c 3 8.8.8.8
+ping -c 3 archive.ubuntu.com
+nslookup archive.ubuntu.com
+curl -I http://archive.ubuntu.com/ubuntu/
+cat /etc/resolv.conf
+ip route
+```
+
+Proxy configuration example for APT:
+
+```bash
+sudo tee /etc/apt/apt.conf.d/01proxy >/dev/null <<'EOF2'
+Acquire::http::Proxy "http://proxy.company.com:8080";
+Acquire::https::Proxy "http://proxy.company.com:8080";
+EOF2
+sudo apt update
+```
+
+Temporary proxy environment variables:
+
+```bash
+export http_proxy=http://proxy.company.com:8080
+export https_proxy=http://proxy.company.com:8080
+sudo -E apt update
+```
+
+Temporary DNS test:
+
+```bash
+echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
+echo "nameserver 1.1.1.1" | sudo tee -a /etc/resolv.conf
+```
+
+### 5. Package-manager lock or another package process is running
+
+Package installation can fail when unattended upgrades, cloud-init, or another administrator session is already using the package database. This usually appears as a lock-file error on Debian-family systems.[7][8]
+
+Checks:
+
+```bash
+ps aux | grep -i apt
+ps aux | grep -i dpkg
+sudo lsof /var/lib/dpkg/lock-frontend
+sudo lsof /var/lib/apt/lists/lock
+```
+
+Fix:
+
+```bash
+sudo kill <PID>
+sudo dpkg --configure -a
+sudo apt update
+```
+
+The safest approach is to verify whether a legitimate package process is still active before killing anything or removing lock files manually.[8]
+
+### 6. Broken dpkg state or interrupted installation
+
+A package transaction that was interrupted by reboot, session loss, automation failure, or network interruption can leave the package manager in an inconsistent state. Once this happens, future installs may fail until the package database is repaired.[5][9]
+
+Fix commands:
+
+```bash
+sudo dpkg --configure -a
+sudo apt -f install
+sudo apt update
+sudo apt install -y nginx
+```
+
+If a specific package is broken:
+
+```bash
+sudo dpkg -r <bad-package>
+sudo apt -f install
+```
+
+### 7. GPG key or repository signing error
+
+Repositories may become unusable when signing keys expire, rotate, or are missing. This is common with third-party repositories such as Jenkins, Docker, Kubernetes, HashiCorp, or internal enterprise mirrors.[1][5]
+
+Typical symptom:
+
+- `NO_PUBKEY`
+- `The repository is not signed`
+- `GPG error`
+
+Check:
+
+```bash
+sudo apt update
+```
+
+Fix:
+
+- Re-import the correct vendor or internal signing key according to current repository documentation and rerun `sudo apt update`.[1]
+
+### 8. Disk space or inode exhaustion
+
+Package installation often fails when `/`, `/var`, or `/tmp` is full, or when the filesystem runs out of inodes. This is especially common on small cloud instances, older VMs, or log-heavy workloads.[5]
+
+Checks:
+
+```bash
+df -h
+df -i
+du -sh /var/cache/apt /var/log/* 2>/dev/null
+```
+
+Fix examples:
+
+```bash
+sudo apt clean
+sudo journalctl --vacuum-time=7d
+sudo rm -rf /tmp/*
+df -h
+```
+
+The long-term enterprise solution is to increase storage, manage logs properly, and alert on disk and inode consumption before package operations start failing.[5]
+
+### 9. RHEL subscription or entitlement issue
+
+On Red Hat Enterprise Linux, package installation may fail because the system is not registered, not subscribed, or not attached to the required repositories. SSH still works because subscription state is unrelated to shell access.[6]
+
+Checks:
+
+```bash
+sudo subscription-manager status
+sudo subscription-manager list
+sudo subscription-manager repos --list-enabled
+sudo yum repolist
+```
+
+Fix:
+
+- Attach a valid subscription and enable the required repositories according to organizational policy.[6]
+
+### 10. Enterprise policy restriction
+
+In regulated or centrally managed environments, package installation may be intentionally blocked. Only approved repositories, internal mirrors, change-controlled software, or golden images may be allowed. In such cases, the problem is governance, not technology.[3]
+
+Operational response:
+
+- Check the approved software source.
+- Use the internal mirror or artifact repository.
+- Raise a change request if required.
+- Use image-baking or configuration-management standards if mutable package installation is restricted.[3]
+
+## Standard troubleshooting workflow
+
+### Ubuntu and Debian runbook
+
+```bash
+whoami
+sudo -l
+cat /etc/os-release
+df -h
+df -i
+ip route
+cat /etc/resolv.conf
+ping -c 3 8.8.8.8
+ping -c 3 archive.ubuntu.com
+sudo apt update
+ps aux | grep -E 'apt|dpkg'
+sudo dpkg --configure -a
+sudo apt -f install
+grep -R "^deb" /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null
+sudo apt clean
+sudo rm -rf /var/lib/apt/lists/*
+sudo apt update
+sudo apt install -y nginx
+```
+
+This sequence verifies identity and privileges, validates OS and storage, tests routing and DNS, checks package-manager state, inspects repositories, and then retries installation in a controlled way.[1][5][9][8]
+
+### RHEL, Rocky, AlmaLinux, and Amazon Linux runbook
+
+```bash
+whoami
+sudo -l
+cat /etc/os-release
+df -h
+ip route
+cat /etc/resolv.conf
+ping -c 3 8.8.8.8
+sudo yum repolist
+sudo dnf repolist
+ls -l /etc/yum.repos.d/
+sudo yum clean all
+sudo yum makecache
+sudo dnf clean all
+sudo dnf makecache
+sudo subscription-manager status
+sudo subscription-manager repos --list-enabled
+sudo dnf install -y nginx
+```
+
+This sequence focuses on package-manager readiness, repository health, entitlement state, and connectivity validation for enterprise RHEL-family systems.[6][3]
+
+## Industry-level preventive controls
+
+The best long-term solution is usually operational standardization rather than repeated manual repair. Enterprise teams reduce package-install incidents by using approved internal mirrors, standard proxy configuration, monitoring for disk and DNS issues, enforcing repository templates with configuration management, and pre-baking common software into images when possible.[1][5][3]
+
+Recommended preventive practices:
+
+- Use internal package mirrors for Ubuntu, Debian, and RHEL-family distributions.[1][6]
+- Standardize proxy and DNS configuration for all managed nodes.[1]
+- Monitor disk usage, inode usage, and package-manager errors proactively.[5]
+- Manage third-party repositories and signing keys centrally with Ansible or equivalent automation.[1][3]
+- Prefer immutable images or golden AMIs for common baseline software in production.[3]
+

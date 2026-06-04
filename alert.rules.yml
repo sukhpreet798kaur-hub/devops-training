@@ -1,0 +1,49 @@
+groups:
+  - name: system-alerts
+    rules:
+      - alert: HostHighCPUUsage
+        expr: (100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100)) > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is above 85% for more than 2 minutes."
+
+      - alert: HostHighMemoryUsage
+        expr: ((1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100) > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is above 85% for more than 2 minutes."
+
+      - alert: HostLowDiskSpace
+        expr: |
+          (
+            node_filesystem_avail_bytes{
+              fstype!~"tmpfs|overlay|squashfs|fuse.snapfuse|nsfs|proc|sysfs|devtmpfs",
+              mountpoint!~"^/snap($|/)|^/proc($|/)|^/sys($|/)|^/dev($|/)|^/run($|/)"
+            }
+            /
+            node_filesystem_size_bytes{
+              fstype!~"tmpfs|overlay|squashfs|fuse.snapfuse|nsfs|proc|sysfs|devtmpfs",
+              mountpoint!~"^/snap($|/)|^/proc($|/)|^/sys($|/)|^/dev($|/)|^/run($|/)"
+            }
+          ) * 100 < 15
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Disk free space is below 15% on {{ $labels.mountpoint }}."
+
+      - alert: NodeExporterDown
+        expr: up{job="node-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node Exporter is down"
+          description: "Prometheus cannot scrape Node Exporter."
