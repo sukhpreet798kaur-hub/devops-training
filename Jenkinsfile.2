@@ -1,12 +1,18 @@
 pipeline {
-    options {
-        ansiColor('xterm')
-        timestamps()
-    }
+    agent any   // or: agent { label 'your-node-label' }
 
-    agent {
-        kubernetes {
-            yaml '''
+    stages {
+        stage('Build') {
+            steps {
+                // if ansiColor plugin is installed, you can still wrap:
+                // ansiColor('xterm') {
+                //     sh 'your commands'
+                // }
+                sh 'echo "Hello from Jenkins"'
+            }
+        }
+    }
+}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -36,7 +42,7 @@ spec:
     }
 
     environment {
-        REGISTRY  = 'YOUR_DOCKERHUB_USERNAME'
+        REGISTRY  = 'sukhpreetkaur123'
         APP_NAME  = 'demo-app'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
