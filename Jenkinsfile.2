@@ -1,0 +1,98 @@
+pipeline {
+    options {
+        ansiColor('xterm')
+        timestamps()
+    }
+
+    agent {
+        kubernetes {
+            yaml '''
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    jenkins: k8s-agent
+spec:
+  containers:
+    - name: docker
+      image: docker:24.0-cli
+      command:
+        - cat
+      tty: true
+      volumeMounts:
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+    - name: kubectl
+      image: bitnami/kubectl:latest
+      command:
+        - cat
+      tty: true
+  volumes:
+    - name: docker-sock
+      hostPath:
+        path: /var/run/docker.sock
+            '''
+        }
+    }
+
+    environment {
+        REGISTRY  = 'YOUR_DOCKERHUB_USERNAME'
+        APP_NAME  = 'demo-app'
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build image') {
+            steps {
+                container('docker') {
+                    dir('app') {
+                        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                            sh '''
+                                echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                                docker build -t $REGISTRY/$APP_NAME:$IMAGE_TAG .
+                                docker push $REGISTRY/$APP_NAME:$IMAGE_TAG
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            when {
+                branch 'main'
+            }
+            steps {
+                container('kubectl') {
+                    withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
+                        sh '''
+                            cp k8s/deployment.yaml k8s/deployment.rendered.yaml
+                            sed -i "s|IMAGE_PLACEHOLDER|$REGISTRY/$APP_NAME:$IMAGE_TAG|" k8s/deployment.rendered.yaml
+                            kubectl apply -f k8s/deployment.rendered.yaml
+                            kubectl apply -f k8s/service.yaml
+                            kubectl rollout status deployment/demo-app-deployment
+                        '''
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline finished'
+        }
+        success {
+            echo 'Build and deployment completed successfully'
+        }
+        failure {
+            echo 'Pipeline failed'
+        }
+    }
+}
