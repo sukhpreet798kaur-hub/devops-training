@@ -13,53 +13,45 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                echo 'Checking out source code'
                 checkout scm
             }
         }
 
-        stage('Verify Files') {
+        stage('Verify Workspace') {
             steps {
-                echo 'Listing project files'
                 sh '''
+                    echo "Current directory:"
                     pwd
+                    echo "Workspace files:"
                     ls -la
-                    echo "---- app ----"
-                    ls -la app || true
-                    echo "---- k8s ----"
-                    ls -la k8s || true
+                    echo "Recursive file list:"
+                    find . -maxdepth 3 -type f
                 '''
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                echo 'Building Docker image'
                 sh '''
-                    docker build -t ${APP_NAME}:latest ./app
+                    if [ -f ./app/Dockerfile ]; then
+                      echo "Building from ./app"
+                      docker build -t ${APP_NAME}:latest ./app
+                    elif [ -f ./Dockerfile ]; then
+                      echo "Building from repo root"
+                      docker build -t ${APP_NAME}:latest .
+                    else
+                      echo "Dockerfile not found"
+                      exit 1
+                    fi
                 '''
             }
         }
 
         stage('Validate Kubernetes Manifests') {
             steps {
-                echo 'Showing Kubernetes manifests'
                 sh '''
-                    echo "deployment.yaml"
-                    cat k8s/deployment.yaml
-                    echo "service.yaml"
-                    cat k8s/service.yaml
-                '''
-            }
-        }
-
-        stage('Deploy') {
-            steps {
-                echo 'Deployment stage placeholder'
-                sh '''
-                    echo "Add kubectl apply commands here when your cluster is ready"
-                    # kubectl apply -f k8s/deployment.yaml
-                    # kubectl apply -f k8s/service.yaml
+                    if [ -f k8s/deployment.yaml ]; then cat k8s/deployment.yaml; fi
+                    if [ -f k8s/service.yaml ]; then cat k8s/service.yaml; fi
                 '''
             }
         }
@@ -71,9 +63,6 @@ pipeline {
         }
         failure {
             echo 'Pipeline failed'
-        }
-        always {
-            echo 'Pipeline finished'
         }
     }
 }
