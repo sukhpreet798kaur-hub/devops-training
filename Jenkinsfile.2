@@ -1,0 +1,68 @@
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        APP_NAME = "devops-training"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Verify Workspace') {
+            steps {
+                sh '''
+                    echo "Current directory:"
+                    pwd
+                    echo "Workspace files:"
+                    ls -la
+                    echo "Recursive file list:"
+                    find . -maxdepth 3 -type f
+                '''
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                    if [ -f ./app/Dockerfile ]; then
+                      echo "Building from ./app"
+                      docker build -t ${APP_NAME}:latest ./app
+                    elif [ -f ./Dockerfile ]; then
+                      echo "Building from repo root"
+                      docker build -t ${APP_NAME}:latest .
+                    else
+                      echo "Dockerfile not found"
+                      exit 1
+                    fi
+                '''
+            }
+        }
+
+        stage('Validate Kubernetes Manifests') {
+            steps {
+                sh '''
+                    if [ -f k8s/deployment.yaml ]; then cat k8s/deployment.yaml; fi
+                    if [ -f k8s/service.yaml ]; then cat k8s/service.yaml; fi
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline completed successfully'
+        }
+        failure {
+            echo 'Pipeline failed'
+        }
+    }
+}
