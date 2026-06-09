@@ -15,5 +15,5 @@ route:
 receivers:
   - name: 'email-alert'
     email_configs:
-      - to: 'sukhpreet.kaur@solutionara.in'
+      - to: 'null'
         send_resolved: true

@@ -36,11 +36,13 @@ pipeline {
                         -Dsonar.projectName=devops-training \
                         -Dsonar.projectKey=devops-training \
                         -Dsonar.sources=. \
-                        -Dsonar.projectVersion=${BUILD_NUMBER}
-                    '''
-                }
-            }
-        }
+                        -Dsonar.projectVersion=${BUILD_NUMBER} \
+                        -Dsonar.exclusions=**/dependency-check-report.html,**/dependency-check-report.xml,**/node_modules/**,**/dist/**,**/build/**,**/target/** \
+                        -Dsonar.scm.exclusions.disabled=true
+                     '''
+               }
+           }
+       }
 
         stage('Build Docker Image') {
             steps {
