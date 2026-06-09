@@ -2,20 +2,81 @@ pipeline {
     agent any
 
     environment {
-        SONAR_HOME = tool"Sonar"
+        SONAR_HOME = tool 'Sonar'
+        IMAGE_NAME = 'devops-training'
+        IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
     stages {
         stage('Clone code from Github') {
             steps {
-                git url: 'https://github.com/sukhpreet798kaur-hub/devops-training.git', branch: "master"
+                git url: 'https://github.com/sukhpreet798kaur-hub/devops-training.git', branch: 'master'
+            }
+        }
+
+        stage('Verify Workspace') {
+            steps {
+                sh 'pwd'
+                sh 'ls -la'
+            }
+        }
+
+        stage('OWASP Dependency Check') {
+            steps {
+                dependencyCheck additionalArguments: '--scan ./ --format XML --format HTML', odcInstallation: 'OWASP-DC'
+                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
             }
         }
 
         stage('SonarQube Quality Analysis') {
             steps {
                 withSonarQubeEnv('Sonar') {
-                    sh '$SONAR_HOME/bin/sonar-scanner -Dsonar.projectName=devops-training -Dsonar.projectkey=devops-training'
+                    sh '''
+                        ${SONAR_HOME}/bin/sonar-scanner \
+                        -Dsonar.projectName=devops-training \
+                        -Dsonar.projectKey=devops-training \
+                        -Dsonar.sources=. \
+                        -Dsonar.projectVersion=${BUILD_NUMBER}
+                    '''
                 }
             }
         }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .'
+            }
+        }
+
+        stage('Trivy File System Scan') {
+            steps {
+                sh '''
+                    trivy fs --scanners vuln,secret,misconfig \
+                    --format table \
+                    --exit-code 0 \
+                    .
+                '''
+            }
+        }
+
+        stage('Trivy Docker Image Scan') {
+            steps {
+                sh '''
+                    trivy image --format table --exit-code 0 ${IMAGE_NAME}:${IMAGE_TAG}
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'dependency-check-report.xml, dependency-check-report.html', allowEmptyArchive: true
+        }
+        success {
+            echo 'Pipeline completed successfully.'
+        }
+        failure {
+            echo 'Pipeline failed. Check the logs.'
+        }
+    }
+}
