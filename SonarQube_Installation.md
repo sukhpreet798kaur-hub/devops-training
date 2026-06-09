@@ -122,3 +122,5 @@ tail -n 50 /opt/sonarqube/logs/es.log
 - `web.log` shows application and database startup failures, including permission errors in PostgreSQL.[5]
 - `es.log` shows internal Elasticsearch startup details, which matter because SonarQube depends on Elasticsearch to start correctly.[4]
 
+sudo -u sonarqube /opt/sonarqube/bin/linux-x86-64/sonar.sh start
+sudo -u sonarqube /opt/sonarqube/bin/linux-x86-64/sonar.sh status
