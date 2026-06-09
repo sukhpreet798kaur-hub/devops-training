@@ -16,4 +16,4 @@ receivers:
   - name: 'email-alert'
     email_configs:
       - to: 'null'
-        send_resolved: true
+        send_resolved: false
