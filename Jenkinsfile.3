@@ -80,11 +80,5 @@ pipeline {
         failure {
             echo 'Pipeline failed. Check the logs.'
         }
-        stage('Deploy using docker compose') {
-            steps{
-                sh '''
-                    docker compose -d
-                '''
-            }
-        }
-    }
+     }
+   }
